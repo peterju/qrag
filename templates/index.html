@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="zh-tw">
+
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <!-- RWD 關鍵：加入 viewport meta 標籤 -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>日間部學生 - AI 查詢 (純文字版)</title>
+    <!-- 樣式部分 -->
+    <style>
+        body {
+            font-family: 'Microsoft JhengHei', '微軟正黑體', sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f4;
+        }
+
+        .wrap {
+            max-width: 1200px;
+            margin: 0 auto;
+            background-color: #fff;
+            padding: 20px;
+            box-sizing: border-box; /* 確保 padding 不會讓 wrap 超出寬度 */
+        }
+
+        .main.container {
+            padding: 0 15px;
+        }
+
+        .listBS {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            justify-content: flex-start;
+            margin-bottom: 20px;
+        }
+
+        /* 預設桌面版樣式：每行4個 */
+        .d-item {
+            width: calc(25% - 15px); /* (100% / 4) - (gap * 3/4) */
+            box-sizing: border-box;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            overflow: hidden;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .d-img {
+            flex-grow: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .d-item img {
+            width: 100%; /* 確保圖片寬度充滿容器 */
+            height: auto;
+            object-fit: cover;
+        }
+
+        .d-txt {
+            padding: 15px;
+            background-color: #fafafa;
+        }
+
+        .d-txt a {
+            text-decoration: none;
+            color: #333;
+            font-weight: bold;
+        }
+
+        .ai-query-container {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 12px;
+            padding: 25px;
+            margin: 30px auto;
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.08);
+            max-width: 1140px;
+        }
+
+        .ai-query-container h3 {
+            margin-top: 0;
+            font-size: 24px;
+            color: #343a40;
+        }
+
+        .ai-query-input-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        #ai-question-input {
+            flex-grow: 1;
+            padding: 12px 15px;
+            font-size: 16px;
+            border: 1px solid #ced4da;
+            border-radius: 8px;
+            min-width: 0; /* 解決 flex 佈局下的壓縮問題 */
+        }
+
+        #ai-query-btn {
+            padding: 12px 25px;
+            font-size: 16px;
+            font-weight: bold;
+            color: #fff;
+            background-color: #007bff;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            flex-shrink: 0; /* 防止按鈕被壓縮 */
+        }
+
+        #ai-query-btn:disabled {
+            background-color: #6c757d;
+            cursor: not-allowed;
+        }
+
+        #ai-query-status {
+            margin-top: 15px;
+            color: #6c757d;
+            font-size: 14px;
+            min-height: 21px;
+            word-break: break-word; /* 讓長字串能自動換行 */
+        }
+
+        #ai-query-status .found-item {
+            color: #28a745;
+            font-weight: bold;
+        }
+
+        .ai-highlight {
+            transition: all 0.3s ease-in-out;
+            border: 4px solid #dc3545 !important;
+            transform: scale(1.02);
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15);
+            z-index: 10;
+            position: relative;
+        }
+
+        /* --- RWD 媒體查詢 --- */
+
+        /* 平板尺寸 (螢幕寬度小於等於 992px) */
+        @media (max-width: 992px) {
+            .d-item {
+                /* 每行2個 */
+                width: calc(50% - 10px); /* (100% / 2) - (gap / 2) */
+            }
+            .wrap {
+                padding: 15px;
+            }
+        }
+
+        /* 手機尺寸 (螢幕寬度小於等於 576px) */
+        @media (max-width: 576px) {
+            .d-item {
+                /* 每行1個 */
+                width: 100%;
+            }
+            .wrap {
+                padding: 10px;
+            }
+            .ai-query-container {
+                padding: 15px;
+                margin: 20px auto;
+            }
+            .ai-query-container h3 {
+                font-size: 20px;
+            }
+            .ai-query-input-group {
+                flex-direction: column; /* 將輸入框和按鈕垂直排列 */
+            }
+            .d-txt a {
+                font-size: 15px;
+            }
+        }
+
+    </style>
+</head>
+
+<body>
+    <div class="wrap">
+        <!-- AI 查詢介面 -->
+        <div class="ai-query-container">
+            <h3>AI 智慧查詢-純文字版</h3>
+            <p>請直接輸入您想詢問的問題，我幫您找出相關資訊！ (切換為<a href="/voice">文字語音通用版</a>)</p>
+            <div class="ai-query-input-group">
+                <input type="text" id="ai-question-input" placeholder="例如：宿舍如何申請？或是役男問題？">
+                <button id="ai-query-btn">查詢</button>
+            </div>
+            <div id="ai-query-status"></div>
+        </div>
+
+        <!-- 模擬的主要內容區 -->
+        <div class="main container" id="local-content-wrapper">
+            <div class="module-rcglist">
+                <div class="row listBS">
+                    <!-- 包含全部21個項目 -->
+                    <div class="d-item">
+                        <div class="mbox">
+                            <div class="d-img"><a href="#" title="1-註冊須知(含大一英文分班資訊)"><img
+                                        src="/static/img/adam-kool-ndN00KmbJ1c-unsplash.jpg" alt="ImgDesc" /></a></div>
+                            <div class="d-txt"><a href="#" title="1-註冊須知(含大一英文分班資訊)">1-註冊須知(含大一英文分班資訊)</a></div>
+                        </div>
+                    </div>
+                    <div class="d-item">
+                        <div class="mbox">
+                            <div class="d-img"><a href="#" title="2-親師座談會"><img
+                                        src="/static/img/aedrian-salazar-Tws17PwytpA-unsplash.jpg" alt="ImgDesc" /></a>
+                            </div>
+                            <div class="d-txt"><a href="#" title="2-親師座談會">2-親師座談會</a></div>
+                        </div>
+                    </div>
+                    <div class="d-item">
+                        <div class="mbox">
+                            <div class="d-img"><a href="#" title="3-新生入學輔導"><img
+                                        src="/static/img/amirali-mirhashemian-cRNUvWM9l_I-unsplash.jpg"
+                                        alt="ImgDesc" /></a></div>
+                            <div class="d-txt"><a href="#" title="3-新生入學輔導">3-新生入學輔導</a></div>
+                        </div>
+                    </div>
+                    <div class="d-item">
+                        <div class="mbox">
+                            <div class="d-img"><a href="#" title="4-新生體檢"><img
+                                        src="/static/img/asya-morgunova-ki2Moh6jiCc-unsplash.jpg" alt="ImgDesc" /></a>
+                            </div>
+                            <div class="d-txt"><a href="#" title="4-新生體檢">4-新生體檢</a></div>
+                        </div>
+                    </div>
+                    <div class="d-item">
+                        <div class="mbox">
+                            <div class="d-img"><a href="#" title="5-學生宿舍(新生入住須知)"><img
+                                        src="/static/img/hoyoun-lee-_EfvzmlxcVA-unsplash.jpg" alt="ImgDesc" /></a></div>
+                            <div class="d-txt"><a href="#" title="5-學生宿舍(新生入住須知)">5-學生宿舍(新生入住須知)</a></div>
+                        </div>
+                    </div>
+                    <div class="d-item">
+                        <div class="mbox">
+                            <div class="d-img"><a href="#" title="6-校外租屋"><img
+                                        src="/static/img/clay-banks-31l-8hY1mt4-unsplash.jpg" alt="ImgDesc" /></a></div>
+                            <div class="d-txt"><a href="#" title="6-校外租屋">6-校外租屋</a></div>
+                        </div>
+                    </div>
+                    <div class="d-item">
+                        <div class="mbox">
+                            <div class="d-img"><a href="#" title="7-兵役資訊"><img
+                                        src="/static/img/henry-be-IicyiaPYGGI-unsplash.jpg" alt="ImgDesc" /></a></div>
+                            <div class="d-txt"><a href="#" title="7-兵役資訊">7-兵役資訊</a></div>
+                        </div>
+                    </div>
+                    <div class="d-item">
+                        <div class="mbox">
+                            <div class="d-img"><a href="#" title="8-新生課務"><img
+                                        src="/static/img/hoyoun-lee-bY2Kys3q1C0-unsplash.jpg" alt="ImgDesc" /></a></div>
+                            <div class="d-txt"><a href="#" title="8-新生課務">8-新生課務</a></div>
+                        </div>
+                    </div>
+                    <div class="d-item">
+                        <div class="mbox">
+                            <div class="d-img"><a href="#" title="9-學雜費減免"><img
+                                        src="/static/img/hoyoun-lee-FHKuhp38f_A-unsplash.jpg" alt="ImgDesc" /></a></div>
+                            <div class="d-txt"><a href="#" title="9-學雜費減免">9-學雜費減免</a></div>
+                        </div>
+                    </div>
+                    <div class="d-item">
+                        <div class="mbox">
+                            <div class="d-img"><a href="#" title="10-就學貸款"><img
+                                        src="/static/img/hoyoun-lee-GDLbUSmrmoU-unsplash.jpg" alt="ImgDesc" /></a></div>
+                            <div class="d-txt"><a href="#" title="10-就學貸款">10-就學貸款</a></div>
+                        </div>
+                    </div>
+                    <div class="d-item">
+                        <div class="mbox">
+                            <div class="d-img"><a href="#" title="11-獎助學金資訊"><img
+                                        src="/static/img/hoyoun-lee-lvs2w15Yw4M-unsplash.jpg" alt="ImgDesc" /></a></div>
+                            <div class="d-txt"><a href="#" title="11-獎助學金資訊">11-獎助學金資訊</a></div>
+                        </div>
+                    </div>
+                    <div class="d-item">
+                        <div class="mbox">
+                            <div class="d-img"><a href="#" title="12-弱勢助學計畫"><img
+                                        src="/static/img/hoyoun-lee-oq7ELhpPkz4-unsplash.jpg" alt="ImgDesc" /></a></div>
+                            <div class="d-txt"><a href="#" title="12-弱勢助學計畫">12-弱勢助學計畫</a></div>
+                        </div>
+                    </div>
+                    <div class="d-item">
+                        <div class="mbox">
+                            <div class="d-img"><a href="#" title="13-校內工讀"><img
+                                        src="/static/img/hoyoun-lee-yYxiTfjeJ20-unsplash.jpg" alt="ImgDesc" /></a></div>
+                            <div class="d-txt"><a href="#" title="13-校內工讀">13-校內工讀</a></div>
+                        </div>
+                    </div>
+                    <div class="d-item">
+                        <div class="mbox">
+                            <div class="d-img"><a href="#" title="14-資訊系統學生篇"><img
+                                        src="/static/img/husna-miskandar-FC4z3l4sUYc-unsplash.jpg" alt="ImgDesc" /></a>
+                            </div>
+                            <div class="d-txt"><a href="#" title="14-資訊系統學生篇">14-資訊系統學生篇</a></div>
+                        </div>
+                    </div>
+                    <div class="d-item">
+                        <div class="mbox">
+                            <div class="d-img"><a href="#" title="15-學生綜合資料"><img
+                                        src="/static/img/nik-sYVY_ZKwaxU-unsplash.jpg" alt="ImgDesc" /></a></div>
+                            <div class="d-txt"><a href="#" title="15-學生綜合資料">15-學生綜合資料</a></div>
+                        </div>
+                    </div>
+                    <div class="d-item">
+                        <div class="mbox">
+                            <div class="d-img"><a href="#" title="16-第e學雜費入口網"><img
+                                        src="/static/img/pao-dayag-AwCPMLL-fPc-unsplash.jpg" alt="ImgDesc" /></a></div>
+                            <div class="d-txt"><a href="#" title="16-第e學雜費入口網">16-第e學雜費入口網</a></div>
+                        </div>
+                    </div>
+                    <div class="d-item">
+                        <div class="mbox">
+                            <div class="d-img"><a href="#" title="17-交通資訊"><img
+                                        src="/static/img/vidar-nordli-mathisen-2cNh00feVzw-unsplash.jpg" alt="ImgDesc" /></a>
+                            </div>
+                            <div class="d-txt"><a href="#" title="17-交通資訊">17-交通資訊</a></div>
+                        </div>
+                    </div>
+                    <div class="d-item">
+                        <div class="mbox">
+                            <div class="d-img"><a href="#" title="18-校園地圖"><img
+                                        src="/static/img/robert-lukeman-_RBcxo9AU-U-unsplash.jpg" alt="ImgDesc" /></a>
+                            </div>
+                            <div class="d-txt"><a href="#" title="18-校園地圖">18-校園地圖</a></div>
+                        </div>
+                    </div>
+                    <div class="d-item">
+                        <div class="mbox">
+                            <div class="d-img"><a href="#" title="19-行事曆"><img
+                                        src="/static/img/sam-schooler-E9aetBe2w40-unsplash.jpg" alt="ImgDesc" /></a>
+                            </div>
+                            <div class="d-txt"><a href="#" title="19-行事曆">19-行事曆</a></div>
+                        </div>
+                    </div>
+                    <div class="d-item">
+                        <div class="mbox">
+                            <div class="d-img"><a href="#" title="20-學生手冊"><img
+                                        src="/static/img/urban-vintage-78A265wPiO4-unsplash.jpg" alt="ImgDesc" /></a>
+                            </div>
+                            <div class="d-txt"><a href="#" title="20-學生手冊">20-學生手冊</a></div>
+                        </div>
+                    </div>
+                    <div class="d-item">
+                        <div class="mbox">
+                            <div class="d-img"><a href="#" title="21-3+1就學役男"><img
+                                        src="/static/img/qingbao-meng-01_igFr7hd4-unsplash.jpg"
+                                        alt="ImgDesc" /></a></div>
+                            <div class="d-txt"><a href="#" title="21-3+1就學役男">21-3+1就學役男</a></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        /**
+         * AI 智慧查詢系統 - JavaScript 主程式
+         * 功能說明：
+         * 1. 收集頁面中的所有資料項目（從 title 屬性獲取關鍵字）
+         * 2. 接收使用者輸入的問題
+         * 3. 將問題和關鍵字發送到後端 AI API 進行分析
+         * 4. 根據 AI 回傳的結果高亮顯示相關項目
+         * 5. 提供視覺回饋和錯誤處理
+         */
+
+        // --- 等待 DOM 完全載入後執行主程式 ---
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- 全域變數定義 ---
+
+            // DOM 元素引用：輸入框、按鈕、狀態顯示區域
+            const questionInput = document.getElementById('ai-question-input');  // 使用者問題輸入框
+            const queryBtn = document.getElementById('ai-query-btn');            // 查詢按鈕
+            const statusDiv = document.getElementById('ai-query-status');        // 查詢狀態顯示區域
+
+            // API 端點設定
+            const backendApiUrl = '/api/ai-query';  // 後端 AI 查詢 API 路徑
+
+            // 頁面資料儲存陣列：存放所有可查詢的項目資訊
+            let linkData = [];  // 格式：[{keyword: "項目名稱", element: DOM元素}, ...]
+
+            // --- 核心函式定義 ---
+
+            /**
+             * 更新頁面連結資料
+             * 功能：掃描頁面中所有的 .d-item 元素，提取其中的關鍵字和對應的 DOM 元素
+             * 這個函式會在頁面載入時執行，建立可查詢項目的資料庫
+             */
+            function updateLinkData() {
+                console.log('開始更新頁面連結資料...');
+
+                // 清空舊資料，準備重新收集
+                const newLinkData = [];
+
+                // 找到主要內容區域，如果找不到則使用整個 body
+                const contentArea = document.getElementById('local-content-wrapper') || document.body;
+
+                // 找到所有具有 .d-item 類別的項目元素
+                const linkItems = contentArea.querySelectorAll('.d-item');
+
+                // 使用 Set 來避免重複的關鍵字
+                const keywordSet = new Set();
+
+                // 遍歷每個項目元素
+                linkItems.forEach((item, index) => {
+                    // 在每個項目中找到 <a> 標籤
+                    const anchor = item.querySelector('a');
+
+                    // 從 <a> 標籤的 title 屬性獲取關鍵字，並去除前後空白
+                    const keyword = anchor?.getAttribute('title')?.trim();
+
+                    // 如果關鍵字存在且尚未收集過，則加入資料陣列
+                    if (keyword && !keywordSet.has(keyword)) {
+                        keywordSet.add(keyword);  // 記錄已處理的關鍵字
+                        newLinkData.push({
+                            keyword: keyword,    // 項目的關鍵字（用於 AI 比對）
+                            element: item       // 對應的 DOM 元素（用於高亮顯示）
+                        });
+                        console.log(`收集到項目 ${index + 1}: ${keyword}`);
+                    }
+                });
+
+                // 更新全域變數
+                linkData = newLinkData;
+                console.log(`總共收集到 ${linkData.length} 個項目`);
+            }
+
+            /**
+             * 執行 AI 查詢的主要函式
+             * 功能：
+             * 1. 驗證使用者輸入
+             * 2. 更新 UI 狀態（停用按鈕、顯示載入訊息）
+             * 3. 發送請求到後端 AI API
+             * 4. 處理回應結果並更新 UI
+             * 5. 錯誤處理和狀態恢復
+             */
+            async function performQuery() {
+                console.log('開始執行 AI 查詢...');
+
+                // 步驟 1: 取得使用者輸入並驗證
+                const question = questionInput.value.trim();
+                if (!question) {
+                    statusDiv.textContent = '請先輸入您的問題。';
+                    console.warn('使用者未輸入問題');
+                    return;
+                }
+                console.log(`使用者問題: ${question}`);
+
+                // 步驟 2: 更新 UI 狀態 - 進入載入狀態
+                queryBtn.disabled = true;                    // 停用按鈕防止重複點擊
+                queryBtn.textContent = '查詢中...';          // 更改按鈕文字提示
+                clearHighlights();                           // 清除之前的高亮結果
+                statusDiv.innerHTML = '正在呼叫 AI 模型為您分析，請稍候...';  // 顯示載入訊息
+
+                // 步驟 3: 準備發送給 AI 的資料
+                const keywords = linkData.map(item => item.keyword);  // 提取所有關鍵字
+                console.log(`準備發送 ${keywords.length} 個關鍵字到 AI 模型`);
+
+                try {
+                    // 步驟 4: 發送 HTTP POST 請求到後端 AI API
+                    console.log('正在發送請求到後端 API...');
+                    const response = await fetch(backendApiUrl, {
+                        method: 'POST',                              // 使用 POST 方法
+                        headers: { 'Content-Type': 'application/json' },  // 設定請求標頭
+                        body: JSON.stringify({
+                            question: question,    // 使用者的問題
+                            keywords: keywords     // 所有可查詢的項目關鍵字
+                        })
+                    });
+
+                    // 步驟 5: 檢查 HTTP 回應狀態
+                    if (!response.ok) {
+                        const errorData = await response.json();
+                        throw new Error(errorData.error || `伺服器錯誤: ${response.status}`);
+                    }
+
+                    // 步驟 6: 解析 AI 回應結果
+                    const result = await response.json();
+                    const relevantKeywords = result.relevant_keywords;  // AI 認為相關的關鍵字陣列
+                    console.log('AI 回應結果:', relevantKeywords);
+
+                    // 步驟 7: 根據結果更新 UI
+                    if (relevantKeywords && relevantKeywords.length > 0) {
+                        // 有找到相關項目的情況
+                        console.log(`找到 ${relevantKeywords.length} 個相關項目`);
+
+                        // 建立成功訊息的 HTML
+                        let statusHTML = `為您找到 ${relevantKeywords.length} 個相關項目！<br>`;
+
+                        // 將每個相關項目包裝成可視的標籤
+                        const itemsHTML = relevantKeywords.map(keyword =>
+                            `<span class="found-item">${keyword}</span>`
+                        ).join('、');  // 用頓號分隔多個項目
+
+                        // 更新狀態顯示區域
+                        statusDiv.innerHTML = statusHTML + itemsHTML;
+
+                        // 高亮顯示相關項目
+                        highlightResults(relevantKeywords);
+                    } else {
+                        // 沒有找到相關項目的情況
+                        console.log('未找到相關項目');
+                        statusDiv.textContent = '抱歉，找不到與您問題相關的資訊，請嘗試更換問法。';
+                    }
+
+                } catch (error) {
+                    // 步驟 8: 錯誤處理
+                    console.error('查詢過程發生錯誤:', error);
+                    statusDiv.textContent = `查詢失敗: ${error.message}`;
+
+                } finally {
+                    // 步驟 9: 無論成功或失敗都要恢復 UI 狀態
+                    queryBtn.disabled = false;      // 重新啟用按鈕
+                    queryBtn.textContent = '查詢';   // 恢復按鈕文字
+                    console.log('查詢流程結束');
+                }
+            }
+
+            /**
+             * 高亮顯示查詢結果
+             * @param {Array} keywordsToHighlight - 需要高亮的關鍵字陣列
+             * 功能：
+             * 1. 為匹配的項目添加高亮樣式
+             * 2. 自動捲動到第一個匹配項目
+             */
+            function highlightResults(keywordsToHighlight) {
+                console.log('開始高亮顯示結果:', keywordsToHighlight);
+
+                // 將要高亮的關鍵字轉換為 Set 以提高查找效率
+                const highlightSet = new Set(keywordsToHighlight);
+
+                // 遍歷所有頁面項目，檢查是否需要高亮
+                linkData.forEach((pageItem, index) => {
+                    if (highlightSet.has(pageItem.keyword)) {
+                        // 為匹配的項目添加高亮 CSS 類別
+                        pageItem.element.classList.add('ai-highlight');
+                        console.log(`高亮項目 ${index + 1}: ${pageItem.keyword}`);
+                    }
+                });
+
+                // 自動捲動到第一個匹配的項目以提升使用者體驗
+                if (keywordsToHighlight.length > 0) {
+                    const firstMatchItem = linkData.find(pageItem =>
+                        pageItem.keyword === keywordsToHighlight[0]
+                    );
+
+                    if (firstMatchItem) {
+                        console.log('自動捲動到第一個匹配項目');
+                        firstMatchItem.element.scrollIntoView({
+                            behavior: 'smooth',  // 平滑捲動效果
+                            block: 'center'      // 將項目置於螢幕中央
+                        });
+                    }
+                }
+            }
+
+            /**
+             * 清除所有高亮效果
+             * 功能：移除頁面中所有具有 .ai-highlight 類別的元素的高亮效果
+             * 使用時機：新查詢開始前、重置頁面狀態時
+             */
+            function clearHighlights() {
+                console.log('清除所有高亮效果');
+                // 找到所有具有高亮類別的元素並移除該類別
+                document.querySelectorAll('.ai-highlight').forEach(item =>
+                    item.classList.remove('ai-highlight')
+                );
+            }
+
+            // --- 程式初始化和事件綁定 ---
+
+            console.log('初始化 AI 查詢系統...');
+
+            // 初始化：收集頁面資料
+            updateLinkData();
+
+            // 事件綁定 1: 查詢按鈕點擊事件
+            queryBtn.addEventListener('click', () => {
+                console.log('使用者點擊查詢按鈕');
+                performQuery();
+            });
+
+            // 事件綁定 2: 輸入框 Enter 鍵事件（提升使用者體驗）
+            questionInput.addEventListener('keydown', (event) => {
+                if (event.key === 'Enter') {
+                    console.log('使用者按下 Enter 鍵');
+                    performQuery();
+                }
+            });
+
+            console.log('AI 查詢系統初始化完成！');
+        });
+    </script>
+</body>
+</html>
