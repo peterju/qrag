@@ -109,7 +109,7 @@
 
 6.  **啟動 Flask 應用程式**
     ```bash
-    python app.py
+    flask --debug run
     ```
     當您看到 `AI查詢服務已啟動...` 的訊息時，表示伺服器已成功運行。
 
