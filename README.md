@@ -83,14 +83,23 @@
     pip install Flask Flask-Cors requests dotenv google.generativeai
     ```
 
-4.  **(可選) 設定 Gemini API 金鑰**
-    若要使用 Gemini 服務，請在專案根目錄下建立一個名為 `.env` 的檔案，並在其中填入您的 API 金鑰：
-    ```
-    GEMINI_API_KEY="AIzaSy...YOUR_API_KEY"
-    ```
+4.  **設定 Gemini API 金鑰**
+    若您計畫使用 Google Gemini 服務 (這是 `app.py` 中的預設選項之一)，此步驟為 **必要** 操作。
 
-5.  **(可選) 設定並啟動 Ollama 服務**
-    若要使用 Ollama，請確保您的 Ollama 應用程式正在背景執行。
+    a. **建立 `.env` 檔案**
+       在專案的根目錄下 (與 `app.py` 同一層)，手動建立一個名為 `.env` 的檔案。
+
+    b. **填入您的 API 金鑰**
+       在 `.env` 檔案中，加入以下內容，並將 `YOUR_API_KEY` 替換為您自己的 Google Gemini API 金鑰：
+       ```
+       GEMINI_API_KEY="YOUR_API_KEY"
+       ```
+
+    > **⚠️ 重要提醒：**
+    > `.env` 檔案是用來存放 API 金鑰的，請**絕對不要**將此檔案提交到 Git 或任何公開的版本控制系統中，以防金鑰外洩。專案中已包含的 `.gitignore` 檔案預設會忽略 `.env`，請確保此設定未被更改。
+
+5.  **設定並啟動 Ollama 服務**
+    若要使用 Ollama，此步驟為 **必要** 操作，請確定您已安裝好 Ollama 且正在背景執行。
 
     a. **下載模型**
         ```bash
