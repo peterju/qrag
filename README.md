@@ -1,5 +1,8 @@
 # 智慧問答關鍵字查詢 API
 
+![Python Version](https://img.shields.io/badge/python-3.7+-blue.svg)
+![License](https://img.shields.io/badge/license-MIT-green.svg)
+
 這是一個基於 Flask 開發的後端應用程式，旨在提供一個智慧的 AI 查詢 API。它接收使用者的自然語言問題和一個預設的關鍵字列表，並利用大型語言模型（LLM）來分析問題，找出與問題最相關的關鍵字。
 
 此專案的設計初衷是為「國立勤益科技大學」新生提供一個快速找到問題解答的管道，例如，當新生詢問「住哪裡比較方便？」時，系統能自動回傳「5-學生宿舍」和「6-校外租屋」這兩個最相關的項目。
@@ -56,7 +59,7 @@
 
 1.  **複製專案**
     ```bash
-    git clone <repository-url>
+    git clone https://github.com/peterju/qrag.git
     cd qrag
     ```
 
@@ -74,6 +77,10 @@
 3.  **安裝相依套件**
     ```bash
     pip install -r requirements.txt
+    ```
+    或全新安裝
+    ```bash
+    pip install Flask Flask-Cors requests dotenv google.generativeai
     ```
 
 4.  **(可選) 設定 Gemini API 金鑰**
@@ -109,12 +116,39 @@
 
 6.  **啟動 Flask 應用程式**
     ```bash
+    # 官網建議的啟動指令，它會以除錯模式啟動應用程式
     flask --debug run
     ```
     當您看到 `AI查詢服務已啟動...` 的訊息時，表示伺服器已成功運行。
 
 7.  **開啟瀏覽器**
     在瀏覽器中開啟 `http://127.0.0.1:5000` 即可看到前端測試頁面。
+
+
+## 組態設定 (Configuration)
+為了讓開發者能輕鬆切換與測試不同的 AI 模型，本專案將幾個關鍵的設定抽離為 app.py 頂部的常數。您可以直接修改這些常數來改變應用程式的預設行為，而無需更動核心邏輯。
+- AI_SERVICE: 控制預設使用的 AI 引擎。
+  - 預設值: "ollama"
+  - 可選值: "gemini"
+  - 範例: 若您希望應用程式啟動時預設使用 Google Gemini，只需將此行改為 AI_SERVICE = "gemini"。
+- DEFAULT_OLLAMA_MODEL: 設定當使用 Ollama 服務時，預設呼叫的模型名稱。
+  - 預設值: "gemma3:4b"
+  - 範例: 如果您在本機下載了 mistral 模型並想使用它，可以將此行改為 DEFAULT_OLLAMA_MODEL = "mistral"。
+- DEFAULT_GEMINI_MODEL: 設定當使用 Gemini 服務時，預設呼叫的模型名稱。
+  - 預設值: "gemini-2.0-flash"
+  - 範例: 若要切換到其他 Gemini 模型，例如 gemini-2.5-flash，請修改此值。
+```python
+# --- 組態設定 ---
+# 決定預設使用的 AI 服務 ('ollama' 或 'gemini')
+AI_SERVICE = "gemini"
+
+# 設定不同服務的預設模型
+# ollama 可使用的模型：'kenneth85/llama-3-taiwan:latest', 'gemma3:4b', 'gemma3n:e2b', 'mistral', 'granite3.3', 'qwen3:4b'
+DEFAULT_OLLAMA_MODEL = "mistral"
+# gemini 可使用的模型：'gemini-2.0-flash', 'gemini-2.5-flash', 'gemini-1.5-flash'
+DEFAULT_GEMINI_MODEL = "gemini-2.5-flash"
+# --- 組態設定結束 ---
+```
 
 ## API 端點說明
 
@@ -172,6 +206,29 @@
     }
     ```
 
+## 前端互動流程
+
+本專案提供的 `index.html` (純文字版) 和 `voice.html` (語音文字通用版) 不僅是 API 的測試頁面，也完整地展示了一套從前端到後端的智慧查詢應用流程：
+
+1.  **資料收集 (Data Collection)**
+    *   當頁面載入完成後，前端的 JavaScript 會自動掃描頁面中所有可查詢的項目 (即帶有 `.d-item` 樣式的元素)。
+    *   它會從每個項目中提取出關聯的關鍵字 (例如，從 `<a>` 標籤的 `title` 屬性)，並在記憶體中建立一個包含「關鍵字」與「對應頁面元素」的資料列表。
+
+2.  **請求建構 (Request Construction)**
+    *   當使用者在輸入框中輸入問題並點擊「查詢」按鈕時，前端會將「使用者的問題」和上一步收集到的「完整關鍵字列表」組合成一個符合 API 要求的 JSON 物件。
+
+3.  **API 呼叫 (API Call)**
+    *   前端接著使用 `fetch` API，向後端的 `/api/ai-query` 端點發送一個 `POST` 請求，並將建構好的 JSON 物件作為請求主體 (payload) 一併送出。
+
+4.  **結果呈現 (Result Presentation)**
+    *   成功收到後端回傳的 `relevant_keywords` (相關關鍵字列表) 後，前端會遍歷這個列表。
+    *   對於每一個相關的關鍵字，前端會從記憶體的資料列表中找到它對應的頁面元素，並為該元素動態添加醒目的高亮樣式 (`ai-highlight` class)，同時自動將頁面捲動到第一個被高亮的項目，以引導使用者注意。
+
+此外，`voice.html` 頁面更進一步整合了瀏覽器的 **Web Speech API**，增加了一個麥克風按鈕。使用者點擊後可以直接用說話的方式提問，語音識別出的文字會自動填入輸入框並觸發查詢，提供更便利的互動體驗。
+
+這個流程清晰地展示了如何將一個既有的靜態網頁，透過後端 AI API 的賦能，升級為一個具有動態、智慧查詢能力的互動
+
+
 ## 如何擴充新的 AI 模型？
 
 若未來要新增一個例如 `NewAIService` 的模型，只需三步驟：
@@ -182,7 +239,6 @@
 
 完成後，整個系統就能在不更動主程式邏輯的情況下，無縫支援新的 AI 模型。
 
-此外，您也可以透過在 API 請求中加入 `"service": "gemini"` 參數來指定要使用的 AI 服務。目前的網頁前端預設使用 `ollama`，但您可以透過 Postman 或其他工具來測試此功能。
 
 ## 疑難排解
 

@@ -26,18 +26,27 @@ try:
     from google.generativeai.client import configure
     from google.generativeai.generative_models import GenerativeModel
 except ImportError:
-    genai = None
-    configure = None
-    GenerativeModel = None
+    genai = configure = GenerativeModel = None
 
 # 在應用程式啟動時載入 .env 檔案中的環境變數
 load_dotenv()
 
+# --- 組態設定 ---
+# 決定預設使用的 AI 服務 ('ollama' 或 'gemini')
+AI_SERVICE = "ollama"
+
+# 設定不同服務的預設模型
+# ollama 可使用的模型：'kenneth85/llama-3-taiwan:latest', 'gemma3:4b', 'gemma3n:e2b', 'mistral', 'granite3.3', 'qwen3:4b'
+DEFAULT_OLLAMA_MODEL = "gemma3:4b"
+# gemini 可使用的模型：'gemini-2.0-flash', 'gemini-2.5-flash', 'gemini-1.5-flash'
+DEFAULT_GEMINI_MODEL = "gemini-2.0-flash"
+# --- 組態設定結束 ---
+
+
 # ------------------- 初始化 Flask 應用 -------------------
 app = Flask(__name__)  # 建立一個Flask應用實例
-CORS(
-    app
-)  # 允許所有來源的跨域請求，若在正式上線的生產環境中，可以設定更嚴格的來源限制。
+# 允許所有來源的跨域請求，若在正式上線的生產環境中，可以設定更嚴格的來源限制。
+CORS(app)
 
 # ==============================================================================
 # --- 1. AI 服務層 (物件導向的策略模式) ---
@@ -65,8 +74,7 @@ class BaseAIService(ABC):
 class OllamaService(BaseAIService):
     """使用本地 Ollama 模型來實現 AI 服務。"""
 
-    # 可使用的語言模型：'kenneth85/llama-3-taiwan:latest', 'gemma3:4b', 'gemma3n:e2b', 'mistral', 'granite3.3', 'qwen3:4b'
-    def __init__(self, model_name: str = "gemma3:4b"):
+    def __init__(self, model_name: str = DEFAULT_OLLAMA_MODEL):
         """初始化 Ollama 服務。"""
         self.model_name = model_name
         self.api_url = "http://localhost:11434/api/generate"
@@ -98,8 +106,7 @@ class OllamaService(BaseAIService):
 class GeminiService(BaseAIService):
     """使用 Google Gemini 模型來實現 AI 服務。"""
 
-    # 可使用的語言模型：'gemini-2.0-flash', 'gemini-2.5-flash', 'gemini-1.5-flash'
-    def __init__(self, model_name: str = "gemini-1.5-flash"):
+    def __init__(self, model_name: str = DEFAULT_GEMINI_MODEL):
         """
         初始化 Gemini 服務，讀取並設定 API Key。
         """
@@ -213,9 +220,9 @@ def parse_ai_response(response_text: str) -> list:
 
     # re.search 會尋找第一個匹配的模式。
     # 新的正則表達式 r'(\{[\s\S]*?\}|\[[\s\S]*?\])' 的詳細解析:
-    #   \{[\s\S]*?\} 匹配 {...} 形式的JSON物件
-    #   | 是 "或" 的意思
-    #   \[[\s\S]*?\] 匹配 [...] 形式的JSON陣列
+    #  -  \{[\s\S]*?\} 匹配 {...} 形式的JSON物件
+    #  -  | 是 "或" 的意思
+    #  -  \[[\s\S]*?\] 匹配 [...] 形式的JSON陣列
     # 這使得正則表達式可以同時捕捉這兩種常見的JSON根結構
     match = re.search(r"(\{[\s\S]*?\}|\[[\s\S]*?\])", response_text)
     if not match:
@@ -227,10 +234,7 @@ def parse_ai_response(response_text: str) -> list:
 
     # 預處理JSON字串，將非標準的單引號、中文引號與反斜線替換為標準的雙引號
     cleaned_json_str = (
-        json_str.replace("「", '"')
-        .replace("」", '"')
-        .replace("'", '"')
-        .replace('\\"', '"')
+        json_str.replace("「", '"').replace("」", '"').replace("'", '"').replace('\\"', '"')
     )
     if json_str != cleaned_json_str:
         print(f"已將非標準引號轉換為標準雙引號: {cleaned_json_str}")
@@ -347,8 +351,8 @@ def ai_query():
         # --- 步驟 2: 執行資料轉換管道 (Data Pipeline) ---
 
         # 2a. 從工廠取得所需的 AI 服務物件 (OOP 策略模式)
-        # 未來若要切換，只需更改 "ollama" 為 "gemini"
-        ai_service = get_ai_service("ollama")
+        # 未來若要切換，只需更改頂部的 AI_SERVICE 常數
+        ai_service = get_ai_service(AI_SERVICE)
 
         # 2b. 呼叫 AI 服務取得解析後的「原始關鍵字列表」 (FP 流程開始)
         llm_answer_keywords = ai_service.get_ai_keywords(
