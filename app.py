@@ -6,6 +6,7 @@
 
 # ------------------- 引入必要的函式庫 -------------------
 import json  # 用於處理JSON格式的資料(解析與生成)
+import os  # 用於處理環境變數和檔案路徑
 import re  # 用於正規表示式處理，提取關鍵字中的數字編號
 from abc import ABC, abstractmethod  # 用於建立抽象基礎類別 (服務合約)
 
@@ -17,6 +18,20 @@ from flask import Flask, jsonify, render_template, request
 # Flask-CORS: 解決瀏覽器"同源策略"限制，允許前端網頁(不同來源)呼叫此API。
 # 在本地開發時，前端是 file:// 協議，後端是 http://，來源不同，必須使用CORS。
 from flask_cors import CORS
+from dotenv import load_dotenv  # 用於載入環境變數，從 .env 檔案讀取敏感資訊
+
+# 嘗試引入 Gemini 函式庫，如果未安裝則設為 None，避免程式啟動失敗
+try:
+    import google.generativeai as genai
+    from google.generativeai.client import configure
+    from google.generativeai.generative_models import GenerativeModel
+except ImportError:
+    genai = None
+    configure = None
+    GenerativeModel = None
+
+# 在應用程式啟動時載入 .env 檔案中的環境變數
+load_dotenv()
 
 # ------------------- 初始化 Flask 應用 -------------------
 app = Flask(__name__)  # 建立一個Flask應用實例
@@ -83,34 +98,61 @@ class OllamaService(BaseAIService):
         # 步驟 4: 呼叫純函式來解析回應
         return parse_ai_response(ai_response_text)
 
-
-# --- Gemini 服務的骨架 (未來擴充用) ---
+# --- Gemini 服務的具體實作 ---
 class GeminiService(BaseAIService):
-    """(尚未實作) 使用 Google Gemini 模型來實現 AI 服務。"""
+    """使用 Google Gemini 模型來實現 AI 服務。"""
+
+    MODEL_NAME = "gemini-2.0-flash"  # 可用的模型：gemini-1.5-flash-latest, gemini-2.0-flash, gemini-2.5-flash
+
+    def __init__(self):
+        """
+        初始化 Gemini 服務，從 gemini_api.key 檔案讀取並設定 API Key。
+        """
+        if not genai or not GenerativeModel or not configure:
+            raise ImportError(
+                "Gemini 服務需要 'google-generativeai' 函式庫。請先安裝: pip install google-generativeai"
+            )
+        # 從環境變數讀取 API Key
+        api_key = os.getenv("GEMINI_API_KEY")
+
+        if not api_key:
+            raise ValueError(
+                "錯誤：找不到 'GEMINI_API_KEY' 環境變數。\n"
+                "請在 .env 檔案中設定 GEMINI_API_KEY='您的金鑰'，"
+                "或在您的部署環境中設定此環境變數。"
+            )
+
+        # 注意: configure 是全域設定
+        configure(api_key=api_key)
+        self.model = GenerativeModel(
+            self.MODEL_NAME,
+            # 要求 Gemini 直接回傳 JSON 格式，並設定溫度
+            generation_config={
+                "response_mime_type": "application/json",
+                "temperature": 0.2,
+            },
+        )
+        print(f"Gemini 服務已初始化，使用模型: {self.MODEL_NAME}")
 
     def get_ai_keywords(self, user_question: str, original_keywords: list) -> list:
-        # TODO: 在這裡加入呼叫 Google Gemini API 的完整邏輯
-        print("\n--- 正在使用 Google Gemini (尚未實作) ---")
+        """使用 Google Gemini 模型來實現 AI 服務。"""
+        prompt = build_prompt(user_question, original_keywords)
+        print(
+            f"\n--- 正在建構提示詞給 Gemini ---\n{prompt}\n---------------------------------"
+        )
 
-        # 1. 引入 Google Gemini 的 SDK (pip install google-generativeai)
-        # import google.generativeai as genai
+        print("正在向 Google Gemini API 發送請求...")
+        # 移除內部的 try-except，讓錯誤向上拋出，由 ai_query 統一處理
+        response = self.model.generate_content(prompt)
+        print(f"Gemini 原始回應: {response.text}")
 
-        # 2. 設定您的 API Key
-        # genai.configure(api_key="YOUR_GOOGLE_API_KEY")
+        # 因為已要求回傳 JSON，直接用 json.loads 解析即可
+        # 讓上層的 ai_query 函式統一處理可能的解析錯誤 (JSONDecodeError)
+        parsed_json = json.loads(response.text)
 
-        # 3. 根據 Gemini 的要求建構提示詞 (可能需要一個新的 build_gemini_prompt 函式)
-        # gemini_prompt = build_prompt(user_question, original_keywords) # 或使用專用 prompt
+        # 確保回傳的是一個列表
+        return parsed_json if isinstance(parsed_json, list) else []
 
-        # 4. 呼叫 Gemini API
-        # model = genai.GenerativeModel('gemini-pro')
-        # response = model.generate_content(gemini_prompt)
-
-        # 5. 解析 Gemini 的回應 (可能需要一個新的 parse_gemini_response 函式)
-        # return parse_ai_response(response.text)
-
-        # 在正式實作前，先拋出一個錯誤或回傳空列表
-        raise NotImplementedError("GeminiService 尚未實作")
-        # return []
 
 
 # --- AI 服務的「工廠」函式 ---
