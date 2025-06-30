@@ -6,10 +6,11 @@
 
 # ------------------- 引入必要的函式庫 -------------------
 import json  # 用於處理JSON格式的資料(解析與生成)
-import re    # 用於正規表示式處理，提取關鍵字中的數字編號
+import re  # 用於正規表示式處理，提取關鍵字中的數字編號
 from abc import ABC, abstractmethod  # 用於建立抽象基礎類別 (服務合約)
 
 import requests  # 用於向其他服務(如Ollama)發送HTTP請求
+
 # Flask: 用於建立輕量級的網頁伺服器與API端點。
 from flask import Flask, jsonify, render_template, request
 
@@ -19,7 +20,9 @@ from flask_cors import CORS
 
 # ------------------- 初始化 Flask 應用 -------------------
 app = Flask(__name__)  # 建立一個Flask應用實例
-CORS(app)  # 允許所有來源的跨域請求，若在正式上線的生產環境中，可以設定更嚴格的來源限制。
+CORS(
+    app
+)  # 允許所有來源的跨域請求，若在正式上線的生產環境中，可以設定更嚴格的來源限制。
 
 # ==============================================================================
 # --- 1. AI 服務層 (物件導向的策略模式) ---
@@ -46,6 +49,7 @@ class BaseAIService(ABC):
 # --- Ollama 服務的具體實作 ---
 class OllamaService(BaseAIService):
     """使用本地 Ollama 模型來實現 AI 服務。"""
+
     # 定義Ollama API的位址。預設情況下，Ollama在本機的11434埠運行。
     OLLAMA_API_URL = "http://localhost:11434/api/generate"
 
@@ -61,10 +65,12 @@ class OllamaService(BaseAIService):
         # 步驟 2: 準備 Ollama API 的請求內容
         payload = {
             # 指定要使用的大語言模型 (例如 'kenneth85/llama-3-taiwan:latest', 'gemma3:4b', 'gemma3n:e2b', 'mistral', 'granite3.3', 'qwen3:4b')
-            "model": "kenneth85/llama-3-taiwan:latest",
+            "model": "gemma3:4b",
             "prompt": prompt,
             "stream": False,  # 設為False，表示我們需要一次性接收完整回應，而非串流式輸出
-            "options": {"temperature": 0.2},  # 將溫度調低，讓模型的回答更具確定性和一致性，減少隨機發揮
+            "options": {
+                "temperature": 0.2
+            },  # 將溫度調低，讓模型的回答更具確定性和一致性，減少隨機發揮
         }
 
         # 步驟 3: 呼叫 Ollama API 並處理回應
@@ -290,6 +296,7 @@ def voice():
     # 使用 render_template 來渲染 'templates' 資料夾中的 'voice.html' 檔案
     return render_template("voice.html")
 
+
 # 定義API的路由(URL路徑)和接受的HTTP方法
 # 此端點的路徑為 /api/ai-query，且只接受 POST 方法的請求。
 @app.route("/api/ai-query", methods=["POST"])
@@ -319,7 +326,9 @@ def ai_query():
         ai_service = get_ai_service("ollama")
 
         # 2b. 呼叫 AI 服務取得解析後的「原始關鍵字列表」 (FP 流程開始)
-        llm_answer_keywords = ai_service.get_ai_keywords(user_question, original_keywords)
+        llm_answer_keywords = ai_service.get_ai_keywords(
+            user_question, original_keywords
+        )
 
         # 2c. 驗證與標準化
         validated_keywords = validate_and_normalize_keywords(
