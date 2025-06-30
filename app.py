@@ -11,6 +11,7 @@ import re  # 用於正規表示式處理，提取關鍵字中的數字編號
 from abc import ABC, abstractmethod  # 用於建立抽象基礎類別 (服務合約)
 
 import requests  # 用於向其他服務(如Ollama)發送HTTP請求
+from dotenv import load_dotenv  # 用於載入環境變數，從 .env 檔案讀取敏感資訊
 
 # Flask: 用於建立輕量級的網頁伺服器與API端點。
 from flask import Flask, jsonify, render_template, request
@@ -18,7 +19,6 @@ from flask import Flask, jsonify, render_template, request
 # Flask-CORS: 解決瀏覽器"同源策略"限制，允許前端網頁(不同來源)呼叫此API。
 # 在本地開發時，前端是 file:// 協議，後端是 http://，來源不同，必須使用CORS。
 from flask_cors import CORS
-from dotenv import load_dotenv  # 用於載入環境變數，從 .env 檔案讀取敏感資訊
 
 # 嘗試引入 Gemini 函式庫，如果未安裝則設為 None，避免程式啟動失敗
 try:
@@ -65,94 +65,77 @@ class BaseAIService(ABC):
 class OllamaService(BaseAIService):
     """使用本地 Ollama 模型來實現 AI 服務。"""
 
-    # 定義Ollama API的位址。預設情況下，Ollama在本機的11434埠運行。
-    OLLAMA_API_URL = "http://localhost:11434/api/generate"
+    # 可使用的語言模型：'kenneth85/llama-3-taiwan:latest', 'gemma3:4b', 'gemma3n:e2b', 'mistral', 'granite3.3', 'qwen3:4b'
+    def __init__(self, model_name: str = "gemma3:4b"):
+        """初始化 Ollama 服務。"""
+        self.model_name = model_name
+        self.api_url = "http://localhost:11434/api/generate"
+        print(f"Ollama 服務已初始化，使用模型: {self.model_name}")
 
     def get_ai_keywords(self, user_question: str, original_keywords: list) -> list:
-        # 步驟 1: 呼叫純函式來建構提示詞
+        # 步驟 1: 建構提示詞
         prompt = build_prompt(user_question, original_keywords)
-        print(
-            "\n--- 正在建構提示詞給 Ollama ---\n"
-            + prompt
-            + "\n---------------------------------"
-        )
+        print(f"\n--- 正在向 Ollama ({self.model_name}) 發送請求 ---")
 
-        # 步驟 2: 準備 Ollama API 的請求內容
+        # 步驟 2: 準備 API 的請求內容
         payload = {
-            # 指定要使用的大語言模型 (例如 'kenneth85/llama-3-taiwan:latest', 'gemma3:4b', 'gemma3n:e2b', 'mistral', 'granite3.3', 'qwen3:4b')
-            "model": "gemma3:4b",
+            "model": self.model_name,
             "prompt": prompt,
-            "stream": False,  # 設為False，表示我們需要一次性接收完整回應，而非串流式輸出
-            "options": {
-                "temperature": 0.2
-            },  # 將溫度調低，讓模型的回答更具確定性和一致性，減少隨機發揮
+            "stream": False,  # 需要一次性接收完整回應
+            "options": {"temperature": 0.2},  # 降低溫度，讓回答更具確定性
         }
 
-        # 步驟 3: 呼叫 Ollama API 並處理回應
-        print("正在向 Ollama 發送請求...")
-        response = requests.post(self.OLLAMA_API_URL, json=payload, timeout=90)
-        response.raise_for_status()  # 如果請求失敗 (如 404, 500)，會在此拋出例外
-        # 接收模型生成的完整原始回應
+        # 步驟 3: 呼叫 API 並處理回應
+        response = requests.post(self.api_url, json=payload, timeout=90)
+        response.raise_for_status()  # 若請求失敗 (如 404, 500)，會在此拋出例外
         ai_response_text = response.json().get("response", "")
 
-        # 步驟 4: 呼叫純函式來解析回應
+        # 步驟 4: 解析回應
         return parse_ai_response(ai_response_text)
+
 
 # --- Gemini 服務的具體實作 ---
 class GeminiService(BaseAIService):
     """使用 Google Gemini 模型來實現 AI 服務。"""
 
-    MODEL_NAME = "gemini-2.0-flash"  # 可用的模型：gemini-1.5-flash-latest, gemini-2.0-flash, gemini-2.5-flash
-
-    def __init__(self):
+    # 可使用的語言模型：'gemini-2.0-flash', 'gemini-2.5-flash', 'gemini-1.5-flash'
+    def __init__(self, model_name: str = "gemini-1.5-flash"):
         """
-        初始化 Gemini 服務，從 gemini_api.key 檔案讀取並設定 API Key。
+        初始化 Gemini 服務，讀取並設定 API Key。
         """
-        if not genai or not GenerativeModel or not configure:
+        if not genai or not configure or not GenerativeModel:
             raise ImportError(
                 "Gemini 服務需要 'google-generativeai' 函式庫。請先安裝: pip install google-generativeai"
             )
-        # 從環境變數讀取 API Key
-        api_key = os.getenv("GEMINI_API_KEY")
 
+        api_key = os.getenv("GEMINI_API_KEY")
         if not api_key:
-            raise ValueError(
-                "錯誤：找不到 'GEMINI_API_KEY' 環境變數。\n"
-                "請在 .env 檔案中設定 GEMINI_API_KEY='您的金鑰'，"
-                "或在您的部署環境中設定此環境變數。"
-            )
+            raise ValueError("錯誤：找不到 'GEMINI_API_KEY' 環境變數。")
 
         # 注意: configure 是全域設定
         configure(api_key=api_key)
         self.model = GenerativeModel(
-            self.MODEL_NAME,
+            model_name,
             # 要求 Gemini 直接回傳 JSON 格式，並設定溫度
             generation_config={
                 "response_mime_type": "application/json",
                 "temperature": 0.2,
             },
         )
-        print(f"Gemini 服務已初始化，使用模型: {self.MODEL_NAME}")
+        print(f"Gemini 服務已初始化，使用模型: {model_name}")
 
     def get_ai_keywords(self, user_question: str, original_keywords: list) -> list:
-        """使用 Google Gemini 模型來實現 AI 服務。"""
+        # 步驟 1: 建構提示詞
         prompt = build_prompt(user_question, original_keywords)
-        print(
-            f"\n--- 正在建構提示詞給 Gemini ---\n{prompt}\n---------------------------------"
-        )
+        print(f"\n--- 正在向 Gemini ({self.model.model_name}) 發送請求 ---")
 
-        print("正在向 Google Gemini API 發送請求...")
-        # 移除內部的 try-except，讓錯誤向上拋出，由 ai_query 統一處理
+        # 步驟 2: 呼叫 API
         response = self.model.generate_content(prompt)
-        print(f"Gemini 原始回應: {response.text}")
 
-        # 因為已要求回傳 JSON，直接用 json.loads 解析即可
-        # 讓上層的 ai_query 函式統一處理可能的解析錯誤 (JSONDecodeError)
-        parsed_json = json.loads(response.text)
-
-        # 確保回傳的是一個列表
-        return parsed_json if isinstance(parsed_json, list) else []
-
+        # 步驟 3: 解析 JSON 回應
+        # 因為已要求回傳 JSON，直接用 json.loads 解析
+        # 由上層的 ai_query 統一處理可能的解析錯誤 (JSONDecodeError)
+        return json.loads(response.text)
 
 
 # --- AI 服務的「工廠」函式 ---
