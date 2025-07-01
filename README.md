@@ -107,20 +107,41 @@
         ```
 
     b. **設定環境變數 (重要)**
-        為了讓 Flask 應用程式可以順利連接到在本機執行的 Ollama 服務，您可能需要設定以下環境變數，特別是當您使用 Docker 或虛擬機時。
+        為了讓您的 Flask 應用程式可以順利連接到在本機執行的 Ollama 服務，您可設定以下環境變數，特別是在 Docker 或虛擬機等跨網路環境下。
+        1. OLLAMA_HOST=0.0.0.0: 允許來自任何網路介面的連線，而不僅僅是本機 (localhost)。
+        2. OLLAMA_KEEP_ALIVE=-1: 讓模型常駐於記憶體中，避免因自動卸載造成的 API 呼叫延遲。
 
-        - **Windows (以系統管理員身分)**:
+        - **Windows 環境**:
+          暫時設定：使用 set 指令，讓 ollama 允許多重來源連線並不要從記憶體中釋放模型 (僅在目前視窗有效)
           ```bash
-          # 設定 OLLAMA_HOST 允許多重來源連線
-          setx OLLAMA_HOST "0.0.0.0"
-          # 重新啟動您的終端機或電腦以使設定生效
+          set OLLAMA_HOST=0.0.0.0
+          set OLLAMA_KEEP_ALIVE=-1
           ```
-
-        - **macOS / Linux**:
+          永久設定：使用 setx 指令 讓 ollama 允許多重來源連線並不要從記憶體中釋放模型
+          1. 設定為目前使用者環境變數 (無需管理員權限)
           ```bash
-          # 設定 OLLAMA_HOST 允許多重來源連線
+          setx OLLAMA_HOST "0.0.0.0"
+          setx OLLAMA_KEEP_ALIVE "-1"
+          ```
+          2. 設定為系統環境變數 (需以管理員身分執行)
+          ```bash
+          setx /m OLLAMA_HOST "0.0.0.0"
+          setx /m OLLAMA_KEEP_ALIVE "-1"
+          ```
+          最後在系統匣右鍵點擊 Ollama 圖示，選擇 Quit Ollama，然後重新啟動它。
+        - **macOS / Linux 環境**:
+          暫時設定 ollama 允許多重來源連線並不要從記憶體中釋放模型
+          ```bash
           export OLLAMA_HOST=0.0.0.0
-          # 若要讓此設定永久生效，請將上述指令加入您的 shell 設定檔中 (例如 ~/.bashrc 或 ~/.zshrc)
+          export OLLAMA_KEEP_ALIVE=-1
+          ```
+          永久設定 ollama 允許多重來源連線並不要從記憶體中釋放模型
+          ```bash
+          # shell 設定檔中，可能是 ~/.bashrc 或 ~/.zshrc
+          echo 'export OLLAMA_HOST=0.0.0.0' >> ~/.zshrc
+          echo 'export OLLAMA_KEEP_ALIVE=-1' >> ~/.zshrc
+          source ~/.zshrc
+          systemctl --user restart ollama # Linux
           ```
 
 6.  **啟動 Flask 應用程式**
