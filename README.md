@@ -116,17 +116,20 @@
           ```bash
           set OLLAMA_HOST=0.0.0.0
           set OLLAMA_KEEP_ALIVE=-1
+          set OLLAMA_ORIGINS=*
           ```
           永久設定：使用 setx 指令 讓 ollama 允許多重來源連線並不要從記憶體中釋放模型
           1. 設定為目前使用者環境變數 (無需管理員權限)
           ```bash
           setx OLLAMA_HOST "0.0.0.0"
           setx OLLAMA_KEEP_ALIVE "-1"
+          setx OLLAMA_ORIGINS "*""
           ```
           2. 設定為系統環境變數 (需以管理員身分執行)
           ```bash
           setx /m OLLAMA_HOST "0.0.0.0"
           setx /m OLLAMA_KEEP_ALIVE "-1"
+          setx /m OLLAMA_ORIGINS "*"
           ```
           最後在系統匣右鍵點擊 Ollama 圖示，選擇 Quit Ollama，然後重新啟動它。
         - **macOS / Linux 環境**:
@@ -134,16 +137,22 @@
           ```bash
           export OLLAMA_HOST=0.0.0.0
           export OLLAMA_KEEP_ALIVE=-1
+          export OLLAMA_ORIGINS=*
           ```
           永久設定 ollama 允許多重來源連線並不要從記憶體中釋放模型
           ```bash
           # shell 設定檔中，可能是 ~/.bashrc 或 ~/.zshrc
           echo 'export OLLAMA_HOST=0.0.0.0' >> ~/.zshrc
           echo 'export OLLAMA_KEEP_ALIVE=-1' >> ~/.zshrc
-          source ~/.zshrc
-          systemctl --user restart ollama # Linux
+          echo 'export OLLAMA_ORIGINS=*' >> ~/.zshrc
           ```
-
+          套用設定
+          ```bash
+          source ~/.zshrc
+          # 在 macOS 上: 從選單列的 Ollama 圖示中選擇 "Quit Ollama"，然後重新啟動應用程式。
+          # 在 Linux 上終端機下達指令
+          systemctl --user restart ollama
+          ```
 6.  **啟動 Flask 應用程式**
     ```bash
     # 官網建議的啟動指令，它會以除錯模式啟動應用程式
